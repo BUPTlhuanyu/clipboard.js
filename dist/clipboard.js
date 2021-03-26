@@ -17,7 +17,7 @@
 return /******/ (function() { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 134:
+/***/ 773:
 /***/ (function(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -33,9 +33,160 @@ var tiny_emitter_default = /*#__PURE__*/__webpack_require__.n(tiny_emitter);
 // EXTERNAL MODULE: ./node_modules/good-listener/src/listen.js
 var listen = __webpack_require__(370);
 var listen_default = /*#__PURE__*/__webpack_require__.n(listen);
+;// CONCATENATED MODULE: ./src/common/removeFake.js
+/**
+ * Only removes the fake element after another click event, that way
+ * a user can hit `Ctrl+C` to copy because selection still exists.
+ */
+function removeFake() {
+  if (this.fakeHandler) {
+    this.container.removeEventListener('click', this.fakeHandlerCallback);
+    this.fakeHandler = null;
+    this.fakeHandlerCallback = null;
+  }
+
+  if (this.fakeElem) {
+    this.container.removeChild(this.fakeElem);
+    this.fakeElem = null;
+  }
+}
 // EXTERNAL MODULE: ./node_modules/select/src/select.js
 var src_select = __webpack_require__(817);
 var select_default = /*#__PURE__*/__webpack_require__.n(src_select);
+;// CONCATENATED MODULE: ./src/common/selectTarget.js
+
+/**
+ * Selects the content from element passed on `target` property.
+ */
+
+function selectTarget() {
+  this.selectedText = select_default()(this.target);
+}
+;// CONCATENATED MODULE: ./src/common/handleResult.js
+/**
+ * Fires an event based on the copy operation result.
+ * @param {Boolean} succeeded
+ */
+function handleResult(succeeded) {
+  this.emitter.emit(succeeded ? 'success' : 'error', {
+    action: this.action,
+    text: this.selectedText,
+    trigger: this.trigger,
+    clearSelection: this.clearSelection.bind(this)
+  });
+}
+;// CONCATENATED MODULE: ./src/actions/cut.js
+
+
+/**
+ * Executes the cut operation based on the current selection.
+ */
+
+var cut = function cut() {
+  var succeeded;
+
+  try {
+    succeeded = document.execCommand('cut');
+  } catch (err) {
+    succeeded = false;
+  }
+
+  return succeeded;
+};
+/**
+ * Select target, cut and return the result.
+ */
+
+
+function action() {
+  selectTarget.call(this);
+  var succeeded = cut();
+  handleResult.call(this, succeeded);
+}
+;// CONCATENATED MODULE: ./src/common/createFakeElement.js
+/**
+ * Creates a fake textarea element, sets its value from `text` property,
+ */
+function createFakeElement() {
+  var isRTL = document.documentElement.getAttribute('dir') === 'rtl';
+  this.fakeElement = document.createElement('textarea'); // Prevent zooming on iOS
+
+  this.fakeElement.style.fontSize = '12pt'; // Reset box model
+
+  this.fakeElement.style.border = '0';
+  this.fakeElement.style.padding = '0';
+  this.fakeElement.style.margin = '0'; // Move element out of screen horizontally
+
+  this.fakeElement.style.position = 'absolute';
+  this.fakeElement.style[isRTL ? 'right' : 'left'] = '-9999px'; // Move element to the same position vertically
+
+  var yPosition = window.pageYOffset || document.documentElement.scrollTop;
+  this.fakeElement.style.top = "".concat(yPosition, "px");
+  this.fakeElement.setAttribute('readonly', '');
+  this.fakeElement.value = this.text;
+  return this.fakeElement;
+}
+;// CONCATENATED MODULE: ./src/common/selectFakeTarget.js
+
+
+
+/**
+ * Get's the value of fakeElem,
+ * and makes a selection on it.
+ */
+
+function selectFakeTarget() {
+  var _this = this;
+
+  var fakeElement = createFakeElement.call(this);
+
+  this.fakeHandlerCallback = function () {
+    return removeFake.call(_this);
+  };
+
+  this.fakeHandler = this.container.addEventListener('click', this.fakeHandlerCallback) || true;
+  this.container.appendChild(fakeElement);
+  this.selectedText = select_default()(fakeElement);
+}
+;// CONCATENATED MODULE: ./src/actions/copy.js
+
+
+
+
+/**
+ * Executes the copy operation based on the current selection.
+ */
+
+var copy = function copy() {
+  var succeeded;
+
+  try {
+    succeeded = document.execCommand('copy');
+  } catch (err) {
+    succeeded = false;
+  }
+
+  return succeeded;
+};
+/**
+ * Select target, copy and return the result.
+ */
+
+
+function copy_action() {
+  var succeeded = false;
+
+  if (this.text) {
+    selectFakeTarget.call(this);
+    succeeded = copy();
+    removeFake.call(this);
+  } else if (this.target) {
+    selectTarget.call(this);
+    succeeded = copy();
+  }
+
+  handleResult.call(this, succeeded);
+}
 ;// CONCATENATED MODULE: ./src/clipboard-action.js
 function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
@@ -44,6 +195,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
 
 function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
+
+
 
 
 /**
@@ -59,6 +212,9 @@ var ClipboardAction = /*#__PURE__*/function () {
     _classCallCheck(this, ClipboardAction);
 
     this.resolveOptions(options);
+    this.cutText = action.bind(this);
+    this.copyText = copy_action.bind(this);
+    this.removeFake = removeFake.bind(this);
     this.initSelection();
   }
   /**
@@ -87,119 +243,11 @@ var ClipboardAction = /*#__PURE__*/function () {
   }, {
     key: "initSelection",
     value: function initSelection() {
-      if (this.text) {
-        this.selectFake();
-      } else if (this.target) {
-        this.selectTarget();
+      if (this.action === 'copy') {
+        this.copyText();
+      } else if (this.action === 'cut') {
+        this.cutText();
       }
-    }
-    /**
-     * Creates a fake textarea element, sets its value from `text` property,
-     */
-
-  }, {
-    key: "createFakeElement",
-    value: function createFakeElement() {
-      var isRTL = document.documentElement.getAttribute('dir') === 'rtl';
-      this.fakeElem = document.createElement('textarea'); // Prevent zooming on iOS
-
-      this.fakeElem.style.fontSize = '12pt'; // Reset box model
-
-      this.fakeElem.style.border = '0';
-      this.fakeElem.style.padding = '0';
-      this.fakeElem.style.margin = '0'; // Move element out of screen horizontally
-
-      this.fakeElem.style.position = 'absolute';
-      this.fakeElem.style[isRTL ? 'right' : 'left'] = '-9999px'; // Move element to the same position vertically
-
-      var yPosition = window.pageYOffset || document.documentElement.scrollTop;
-      this.fakeElem.style.top = "".concat(yPosition, "px");
-      this.fakeElem.setAttribute('readonly', '');
-      this.fakeElem.value = this.text;
-      return this.fakeElem;
-    }
-    /**
-     * Get's the value of fakeElem,
-     * and makes a selection on it.
-     */
-
-  }, {
-    key: "selectFake",
-    value: function selectFake() {
-      var _this = this;
-
-      var fakeElem = this.createFakeElement();
-
-      this.fakeHandlerCallback = function () {
-        return _this.removeFake();
-      };
-
-      this.fakeHandler = this.container.addEventListener('click', this.fakeHandlerCallback) || true;
-      this.container.appendChild(fakeElem);
-      this.selectedText = select_default()(fakeElem);
-      this.copyText();
-      this.removeFake();
-    }
-    /**
-     * Only removes the fake element after another click event, that way
-     * a user can hit `Ctrl+C` to copy because selection still exists.
-     */
-
-  }, {
-    key: "removeFake",
-    value: function removeFake() {
-      if (this.fakeHandler) {
-        this.container.removeEventListener('click', this.fakeHandlerCallback);
-        this.fakeHandler = null;
-        this.fakeHandlerCallback = null;
-      }
-
-      if (this.fakeElem) {
-        this.container.removeChild(this.fakeElem);
-        this.fakeElem = null;
-      }
-    }
-    /**
-     * Selects the content from element passed on `target` property.
-     */
-
-  }, {
-    key: "selectTarget",
-    value: function selectTarget() {
-      this.selectedText = select_default()(this.target);
-      this.copyText();
-    }
-    /**
-     * Executes the copy operation based on the current selection.
-     */
-
-  }, {
-    key: "copyText",
-    value: function copyText() {
-      var succeeded;
-
-      try {
-        succeeded = document.execCommand(this.action);
-      } catch (err) {
-        succeeded = false;
-      }
-
-      this.handleResult(succeeded);
-    }
-    /**
-     * Fires an event based on the copy operation result.
-     * @param {Boolean} succeeded
-     */
-
-  }, {
-    key: "handleResult",
-    value: function handleResult(succeeded) {
-      this.emitter.emit(succeeded ? 'success' : 'error', {
-        action: this.action,
-        text: this.selectedText,
-        trigger: this.trigger,
-        clearSelection: this.clearSelection.bind(this)
-      });
     }
     /**
      * Moves focus away from `target` and back to the trigger, removes current selection.
@@ -948,7 +996,7 @@ module.exports.TinyEmitter = E;
 /******/ 	// module exports must be returned from runtime so entry inlining is disabled
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(134);
+/******/ 	return __webpack_require__(773);
 /******/ })()
 .default;
 });

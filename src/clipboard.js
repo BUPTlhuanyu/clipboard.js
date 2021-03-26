@@ -1,6 +1,8 @@
 import Emitter from 'tiny-emitter';
 import listen from 'good-listener';
-import ClipboardAction from './clipboard-action';
+import ClipboardActionDefault from './clipboard-action-default';
+import ClipboardActionCut from './clipboard-action-cut';
+import ClipboardActionCopy from './clipboard-action-copy';
 
 /**
  * Helper function to retrieve attribute value.
@@ -29,6 +31,8 @@ class Clipboard extends Emitter {
   constructor(trigger, options) {
     super();
 
+    this.ClipboardActionCut = ClipboardActionCut.bind(this);
+    this.ClipboardActionCopy = ClipboardActionCopy.bind(this);
     this.resolveOptions(options);
     this.listenClick(trigger);
   }
@@ -72,7 +76,7 @@ class Clipboard extends Emitter {
       this.clipboardAction = null;
     }
 
-    this.clipboardAction = new ClipboardAction({
+    this.clipboardAction = new ClipboardActionDefault({
       action: this.action(trigger),
       target: this.target(trigger),
       text: this.text(trigger),
@@ -100,6 +104,14 @@ class Clipboard extends Emitter {
     if (selector) {
       return document.querySelector(selector);
     }
+  }
+
+  static copy(target) {
+    return ClipboardActionCopy(target);
+  }
+
+  static cut(target) {
+    return ClipboardActionCut(target);
   }
 
   /**
